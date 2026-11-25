@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>School Result Manager</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f9;--card:#fff;--tx:#1b2430;--mu:#667085;--bd:#d9dee5;--ac:#1d5fd1;--ac2:#e8f0fd;--gold:#f4c430;--sil:#c0c6cf;--bro:#d9a066}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1b222b;--tx:#e8ecf1;--mu:#9aa5b4;--bd:#303a46;--ac:#6ea1ff;--ac2:#22304a}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1200px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:0 0 10px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+button,select,input{font:inherit;color:var(--tx)}
+button{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:7px 12px;cursor:pointer}
+button.on,button.pri{background:var(--ac);color:#fff;border-color:var(--ac)}
+select,input[type=text]{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:7px 9px}
+.wrap{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:10px}
+table{border-collapse:collapse;width:100%}
+th,td{border-bottom:1px solid var(--bd);padding:4px 5px;text-align:center;white-space:nowrap}
+th{background:var(--ac2);font-size:12px;position:sticky;top:0}
+td.l,th.l{text-align:left}
+td input[type=number]{width:46px;text-align:center;border:1px solid var(--bd);border-radius:5px;padding:4px 2px;background:var(--bg)}
+td input.nm{width:170px;text-align:left}
+.pos{font-weight:700}
+.p1{background:var(--gold);color:#000}.p2{background:var(--sil);color:#000}.p3{background:var(--bro);color:#000}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.sheet{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:18px;margin-bottom:14px;max-width:760px}
+.sheet h2{margin:0;text-align:center;font-size:19px}
+.sheet .sub{text-align:center;color:var(--mu);margin-bottom:10px}
+.sheet .info{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin:10px 0;font-weight:600}
+.sum{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.sum div{flex:1;min-width:100px;border:1px solid var(--bd);border-radius:8px;padding:8px;text-align:center}
+.sum b{display:block;font-size:19px}
+.sig{display:flex;justify-content:space-between;margin-top:28px;color:var(--mu)}
+.hide{display:none}
+@media print{body{background:#fff;color:#000}.noprint{display:none!important}main{padding:0}.sheet{border:1px solid #000;page-break-after:always;margin:0;max-width:none;background:#fff;color:#000}th{background:#eee!important;position:static}}
+</style></head><body><main>
+<h1 class="noprint">School Result Manager</h1>
+<div class="bar noprint" id="classBar"></div>
+<div class="bar noprint" id="tabBar">
+ <button data-t="scores">Scores &amp; Positions</button><button data-t="results">Result Sheets</button><button data-t="setup">Setup</button>
+</div>
+<section id="scores" class="noprint"></section>
+<section id="results"></section>
+<section id="setup" class="noprint"></section>
+<input type="file" id="fileIn" accept=".json,application/json" class="hide">
+</main>
+<script>
+const CL=["JSS1","JSS2","JSS3","SS1","SS2","SS3"];
+const SUB=["English Language","Mathematics","Basic Science","Basic Technology","Social Studies","Civic Education","CRS / IRS","Computer Studies","Agricultural Science","Business Studies","Home Economics","Cultural & Creative Arts","French","Physical & Health Ed."];
+const K="schoolResultsV1";
+let D=null;
+try{D=JSON.parse(localStorage.getItem(K)||"null")}catch(e){}
+if(!D){D={school:"Your School Name",session:"2026/2027",term:"First Term",subs:SUB.slice(),cls:{}};
+ CL.forEach(c=>{D.cls[c]=Array.from({length:30},(_,i)=>({n:"",s:Array(14).fill("")}))});}
+let cur="JSS1",tab="scores",sorted=false,pick="all";
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}};
+const $=id=>document.getElementById(id);
+const ord=n=>{const s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])};
+const grade=a=>a>=70?["A","Excellent"]:a>=60?["B","Very Good"]:a>=50?["C","Good"]:a>=45?["D","Fair"]:a>=40?["E","Pass"]:["F","Fail"];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function stats(){
+ const rows=D.cls[cur].map((st,i)=>{const f=st.s.filter(v=>v!=="").map(Number);const t=f.reduce((a,b)=>a+b,0);return{i,t,cnt:f.length,avg:f.length?Math.round(t/f.length*100)/100:null}});
+ const rk=rows.filter(r=>r.avg!==null).sort((a,b)=>b.avg-a.avg);
+ rk.forEach((r,k)=>{r.pos=k&&r.avg===rk[k-1].avg?rk[k-1].pos:k+1});
+ return rows}
+function bars(){
+ $("classBar").innerHTML=CL.map(c=>`<button class="${c===cur?"on":""}" data-c="${c}">${c}</button>`).join("");
+ document.querySelectorAll("#tabBar button").forEach(b=>b.classList.toggle("on",b.dataset.t===tab));
+ ["scores","results","setup"].forEach(t=>$(t).classList.toggle("hide",t!==tab));
+ $("classBar").classList.toggle("hide",tab==="setup");
+ if(tab==="scores")scores();else if(tab==="results")results();else setup();}
+function scores(){
+ const R=stats();let order=R.slice();
+ if(sorted)order.sort((a,b)=>(a.pos||999)-(b.pos||999)||a.i-b.i);
+ const st=D.cls[cur];
+ let h=`<div class="bar"><button id="srt" class="${sorted?"on":""}">${sorted?"Sorted by position":"Sort by position"}</button><button id="addS">+ Add student</button><button id="delS">− Remove last</button><button id="svC">💾 Save this class to file</button><button id="ldC">📂 Load class file</button><span style="color:var(--mu)">${st.length} students · scores 0–100 · average uses subjects with scores</span></div>
+ <div class="wrap"><table><thead><tr><th>#</th><th class="l">Student name</th>${D.subs.map(s=>`<th title="${esc(s)}">${esc(s.slice(0,7))}</th>`).join("")}<th>Total</th><th>Avg</th><th>Pos</th></tr></thead><tbody>`;
+ order.forEach((r,k)=>{const s=st[r.i];h+=`<tr><td>${r.i+1}</td><td class="l"><input type="text" class="nm" data-i="${r.i}" data-j="n" placeholder="Student ${r.i+1}" value="${esc(s.n)}"></td>${s.s.map((v,j)=>`<td><input type="number" min="0" max="100" data-i="${r.i}" data-j="${j}" value="${v}"></td>`).join("")}<td id="t${r.i}"></td><td id="a${r.i}"></td><td id="p${r.i}" class="pos"></td></tr>`});
+ $("scores").innerHTML=h+"</tbody></table></div>";calc();}
+function calc(){
+ stats().forEach(r=>{const t=$("t"+r.i);if(!t)return;t.textContent=r.cnt?r.t:"";$("a"+r.i).textContent=r.avg===null?"":r.avg.toFixed(2);
+ const p=$("p"+r.i);p.textContent=r.pos?ord(r.pos):"";p.className="pos"+(r.pos<=3?" p"+r.pos:"");});}
+function sheet(r,n){
+ const s=D.cls[cur][r.i],g=grade(r.avg||0);
+ return `<div class="sheet"><h2>${esc(D.school)}</h2><div class="sub">Student Report Sheet · ${esc(D.term)} · ${esc(D.session)}</div>
+ <div class="info"><span>Name: ${esc(s.n||"Student "+(r.i+1))}</span><span>Class: ${cur}</span><span>No. in class: ${n}</span></div>
+ <div class="wrap" style="border-radius:6px"><table><thead><tr><th class="l">Subject</th><th>Score</th><th>Grade</th><th>Remark</th></tr></thead><tbody>
+ ${D.subs.map((sb,j)=>{const v=s.s[j];const q=v===""?["",""]:grade(+v);return`<tr><td class="l">${esc(sb)}</td><td>${v}</td><td>${q[0]}</td><td>${q[1]}</td></tr>`}).join("")}</tbody></table></div>
+ <div class="sum"><div>Total<b>${r.t}</b></div><div>Average<b>${r.avg===null?"–":r.avg.toFixed(2)}</b></div><div>Position<b>${r.pos?ord(r.pos)+" of "+n:"–"}</b></div><div>Grade<b>${r.avg===null?"–":g[0]}</b></div></div>
+ <div>Teacher’s remark: <b>${r.avg===null?"":g[1]}</b></div>
+ <div class="sig"><span>Class teacher: __________</span><span>Principal: __________</span></div></div>`}
+function results(){
+ const R=stats().filter(r=>r.cnt).sort((a,b)=>a.pos-b.pos||a.i-b.i),n=R.length;
+ let h=`<div class="bar noprint"><select id="pk"><option value="all">All students (${n})</option>${R.map(r=>`<option value="${r.i}" ${pick==r.i?"selected":""}>${ord(r.pos)} – ${esc(D.cls[cur][r.i].n||"Student "+(r.i+1))}</option>`).join("")}</select><button class="pri" id="prt">Print / Save PDF</button></div>`;
+ if(!n)h+=`<p class="noprint">No scores entered for ${cur} yet. Go to Scores &amp; Positions.</p>`;
+ R.filter(r=>pick==="all"||pick==r.i).forEach(r=>h+=sheet(r,n));
+ $("results").innerHTML=h;}
+function setup(){
+ $("setup").innerHTML=`<div class="sheet"><h2 style="text-align:left">Setup</h2><p>School name<br><input type="text" id="sn" value="${esc(D.school)}" style="width:100%"></p>
+ <div class="bar"><input type="text" id="se" value="${esc(D.session)}"><select id="tm">${["First Term","Second Term","Third Term"].map(t=>`<option ${t===D.term?"selected":""}>${t}</option>`).join("")}</select></div>
+ <p>Subjects (shared by all classes)</p><div class="grid">${D.subs.map((s,i)=>`<input type="text" data-sub="${i}" value="${esc(s)}">`).join("")}</div>
+ <p>Your work is saved automatically in this browser. Use these to keep a backup file or move to another device.</p><div class="bar"><button id="svA" class="pri">💾 Save everything (all classes)</button><button id="ldA">📂 Load backup file</button></div><p><button id="rst">Clear all data</button></p></div>`;}
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+ if(b.dataset.c){cur=b.dataset.c;pick="all";bars()}
+ else if(b.dataset.t){tab=b.dataset.t;bars()}
+ else if(b.id==="srt"){sorted=!sorted;scores()}
+ else if(b.id==="addS"){D.cls[cur].push({n:"",s:Array(14).fill("")});save();scores()}
+ else if(b.id==="delS"){if(D.cls[cur].length>1&&confirm("Remove the last student?")){D.cls[cur].pop();save();scores()}}
+ else if(b.id==="svC"){saveFile("class-"+cur+".json",{type:"class",cls:cur,students:D.cls[cur]})}
+ else if(b.id==="svA"){saveFile("school-backup.json",{type:"all",data:D})}
+ else if(b.id==="ldC"||b.id==="ldA"){const f=$("fileIn");f.dataset.mode=b.id;f.value="";f.click()}
+ else if(b.id==="prt"){try{window.print()}catch(x){}}
+ else if(b.id==="rst"){if(confirm("Delete ALL names and scores?")){try{localStorage.removeItem(K)}catch(x){}CL.forEach(c=>D.cls[c]=Array.from({length:30},()=>({n:"",s:Array(14).fill("")})));save();bars()}}});
+document.addEventListener("input",e=>{const t=e.target,d=t.dataset;
+ if(d.j!==undefined){const s=D.cls[cur][d.i];
+  if(d.j==="n")s.n=t.value;else{let v=t.value;if(v!==""){v=Math.max(0,Math.min(100,+v));if(+t.value>100||+t.value<0)t.value=v}s.s[d.j]=v}
+  save();calc()}
+ else if(d.sub!==undefined){D.subs[d.sub]=t.value;save()}
+ else if(t.id==="sn"){D.school=t.value;save()}else if(t.id==="se"){D.session=t.value;save()}});
+document.addEventListener("change",e=>{if(e.target.id==="pk"){pick=e.target.value;results()}if(e.target.id==="tm"){D.term=e.target.value;save()}});
+let DL=null;
+try{window.claude&&claude.use("downloads").then(d=>{DL=d}).catch(()=>{})}catch(e){}
+function saveFile(name,obj){if(!DL){alert("File saving isn’t available in this view. Your data is still saved automatically in this browser.");return}DL.save({filename:name,data:JSON.stringify(obj)}).catch(()=>{})}
+$("fileIn").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const o=JSON.parse(rd.result);
+ if(o.type==="class"&&CL.includes(o.cls)&&Array.isArray(o.students)){if(!confirm("Replace "+o.cls+" with the saved file?"))return;D.cls[o.cls]=o.students;cur=o.cls}
+ else if(o.type==="all"&&o.data&&o.data.cls){if(!confirm("Replace ALL data with this backup?"))return;D=o.data}
+ else throw 0;
+ save();tab="scores";bars()}catch(x){alert("That doesn’t look like a valid class or backup file.")}};rd.readAsText(f)});
+bars();
+</script></body></html>
